@@ -1,0 +1,40 @@
+1.打开cmd窗口,输入如下命令
+
+keytool -genkey -alias tomcat -keyalg RSA -keystore ./server.keystore 
+
+2.新建springboot项目,将上一步生成的keystone文件复制到项目的根目录,在application.properties添加如下配置
+server.port=8443
+server.ssl.key-store=server.keystore
+server.ssl.key-alias=tomcat
+server.ssl.enabled=true
+server.ssl.key-store-password=123456
+server.ssl.key-store-type=JKS
+
+3.http访问自动转https访问
+向spring容器中注入两个Bean,代码如下
+ @Bean
+	public EmbeddedServletContainerFactory servletContainer(){
+		TomcatEmbeddedServletContainerFactory tomcat=new TomcatEmbeddedServletContainerFactory(){
+			@Override
+			protected void postProcessContext(Context context) {
+				SecurityConstraint securityConstraint=new SecurityConstraint();
+				securityConstraint.setUserConstraint("CONFIDENTIAL");//confidential
+				SecurityCollection collection=new SecurityCollection();
+				collection.addPattern("/*");
+				securityConstraint.addCollection(collection);
+				context.addConstraint(securityConstraint);
+			}
+		};
+		tomcat.addAdditionalTomcatConnectors(httpConnector());
+		return tomcat;
+	}
+
+	@Bean
+	public Connector httpConnector(){
+		Connector connector=new Connector("org.apache.coyote.http11.Http11NioProtocol");
+		connector.setScheme("http");
+		connector.setPort(9090);
+		connector.setSecure(false);
+		connector.setRedirectPort(4445);
+		return connector;
+	}
